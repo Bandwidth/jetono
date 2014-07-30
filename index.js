@@ -82,7 +82,11 @@ function defineModels(plugin, options){
 
 
 module.exports.register = function*(plugin, options){
-  Joi.assert(options, optionsSchema);
+  let result = Joi.validate(options, optionsSchema);
+  if(result.error){
+    throw new Error(result.error.annotate());
+  }
+  options = result.value;
   defineModels(plugin, options);
   let accessTokenCache = plugin.cache({segment: "!!accessTokenCache", expiresIn: options.accessTokenCacheExpiresIn || 300000});
   let validateToken = function* (plugin, models, token){
