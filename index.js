@@ -11,7 +11,7 @@ const charlen = chars.length
 
 let optionsSchema = Joi.object().keys({
   tokenField: Joi.string().default("token"),
-  tokenValidate: Joi.func(),
+  validateToken: Joi.func(),
   minPasswordLength: Joi.number().integer().default(6),
   pepper: Joi.string().min(10).default("JcmjuDxZf8zm"),
   extendUserModel: Joi.func(),
@@ -90,16 +90,18 @@ module.exports.register = function*(plugin, options){
   defineModels(plugin, options);
   let accessTokenCache = plugin.cache({segment: "!!accessTokenCache", expiresIn: options.accessTokenCacheExpiresIn || 300000});
   let validateToken = function* (plugin, models, token){
-    return yield accessTokenCache.getOrGenerate.bind(accessTokenCache, token, function(callback){co(function*(){
-      let accessToken = models.accessToken.findOne({token: token}).populate("user").execQ();
+    return (yield accessTokenCache.getOrGenerate.bind(accessTokenCache, token, function(callback){co(function*(){
+      let accessToken = yield models.accessToken.findOne({token: token}).populate("user").execQ();
       if(!accessToken){
         throw plugin.hapi.error.unauthorized("Invalid token");
       }
       return accessToken;
-    })(callback);});
+    })(callback);}))[0];
   };
 
   plugin.auth.scheme("jetono-token", function (server, config) {
+    config = config || {};
+    debugger;
     return {
       authenticate : function (request, reply) {
         co(function*(){
@@ -114,7 +116,7 @@ module.exports.register = function*(plugin, options){
             throw plugin.hapi.error.internal("plugin co-hapi-models is required");
           }
           let accessToken =  yield validateToken(plugin, request.models, token);
-          let validateFunc = config.tokenValidate || options.tokenValidate;
+          let validateFunc = config.validateToken || options.validateToken;
           if(validateFunc){
             yield validateFunc(accessToken);
           }
@@ -124,74 +126,62 @@ module.exports.register = function*(plugin, options){
     };
   });
 
-  plugin.auth.scheme("jetono-singin", function (server, config) {
-    return {
-      authenticate : function (request, reply) {
-        co(function*(){
-          let userName, password;
-          let items = (request.headers.authorization || "").split(" ");
-          if(items[0].toLowerCase() === "basic" && items[1]){
-            items = new Buffer(items[1], "base64").toString().split(":");
-            userName = items[0];
-            password = items[1];
-          }
-          if(!userName){
-            userName = request.payload[config.userNameField || "username"];
-          }
-          if(!password){
-            password = request.payload[config.passwordField || "password"];
-          }
-          if(!request.models){
-            throw plugin.hapi.error.internal("plugin co-hapi-models is required");
-          }
-          let user = request.models.user.findOne({userName: userName}).execQ();
-          if(!user){
-            throw plugin.hapi.error.unauthorized();
-          }
-          if(!(yield user.comparePassword(password))){
-            throw plugin.hapi.error.unauthorized();
-          }
-          let accessToken = yield new request.models.accessToken({user: user.id}).saveQ();
-          let validateFunc = config.tokenValidate || options.tokenValidate;
-          if(validateFunc){
-            accessToken.user = user;
-            yield validateFunc(accessToken);
-          }
-          return {credentials: {username: accessToken.user.userName, id: accessToken.user.id, token: accessToken.token}};
-        })(reply);
+  plugin.handler("jetono-signin", function (route, config){
+    config = config || {};
+    return function*(request){
+      let userName, password;
+      let items = (request.headers.authorization || "").split(" ");
+      if(items[0].toLowerCase() === "basic" && items[1]){
+        items = new Buffer(items[1], "base64").toString().split(":");
+        userName = items[0];
+        password = items[1];
       }
+      if(!userName){
+        userName = request.payload[config.userNameField || "username"];
+      }
+      if(!password){
+        password = request.payload[config.passwordField || "password"];
+      }
+      if(!request.models){
+        throw plugin.hapi.error.internal("plugin co-hapi-models is required");
+      }
+      let user = yield request.models.user.findOne({userName: userName}).execQ();
+      if(!user){
+        throw plugin.hapi.error.unauthorized();
+      }
+      if(!(yield user.comparePassword(password))){
+        throw plugin.hapi.error.unauthorized();
+      }
+      let accessToken = yield new request.models.accessToken({user: user.id}).saveQ();
+      return {credentials: {username: user.userName, id: user.id, token: accessToken.token}};
     };
   });
 
-  plugin.auth.scheme("jetono-singup", function (server, config) {
-    return {
-      authenticate : function (request, reply) {
-        co(function*(){
-          let userName, password, repeatPassword;
-          userName = request.payload[config.userNameField || "username"];
-          password = request.payload[config.passwordField || "password"];
-          repeatPassword = request.payload[config.repeatPasswordField || "repeatPassword"];
-          if(repeatPassword !== password){
-            throw plugin.hapi.error.unauthorized("Passwords are mismatched");
-          }
-          if(!request.models){
-            throw plugin.hapi.error.internal("plugin co-hapi-models is required");
-          }
-          let user = new request.models.user({userName: userName});
-          yield user.setPassword(password);
-          yield user.saveQ();
-          let accessToken = yield new request.models.accessToken({user: user.id}).saveQ();
-          let validateFunc = config.tokenValidate || options.tokenValidate;
-          if(validateFunc){
-            accessToken.user = user;
-            yield validateFunc(accessToken);
-          }
-          return {credentials: {username: accessToken.user.userName, id: accessToken.user.id, token: accessToken.token}};
-        })(reply);
+  plugin.handler("jetono-signup", function (route, config){
+    config = config || {};
+    return function*(request, reply){
+      let userName, password, repeatPassword;
+      if(request.payload){
+        userName = request.payload[config.userNameField || "username"];
+        password = request.payload[config.passwordField || "password"];
+        repeatPassword = request.payload[config.repeatPasswordField || "repeatPassword"];
       }
+      if(!userName || !password || !repeatPassword){
+        throw plugin.hapi.error.badRequest();
+      }
+      if(repeatPassword !== password){
+        throw plugin.hapi.error.unauthorized("Passwords are mismatched");
+      }
+      if(!request.models){
+        throw plugin.hapi.error.internal("plugin co-hapi-models is required");
+      }
+      let user = new request.models.user({userName: userName});
+      yield user.setPassword(password);
+      yield user.saveQ();
+      let accessToken = yield new request.models.accessToken({user: user.id}).saveQ();
+      return {credentials: {username: user.userName, id: user.id, token: accessToken.token}};
     };
   });
-
 };
 
 module.exports.register.attributes = {
