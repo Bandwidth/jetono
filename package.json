@@ -16,8 +16,9 @@
     "url": "https://github.com/bandwidthcom/jetono/issues"
   },
   "devDependencies": {
-    "co": "^3.0.6",
     "co-hapi": "^0.0.9",
+    "co-hapi-models": "0.0.3",
+    "co-hapi-mongoose": "0.0.4",
     "co-mocha": "^0.0.4",
     "hapi": "^6.2.1",
     "mocha": "^1.21.0",
@@ -26,6 +27,8 @@
   },
   "homepage": "https://github.com/bandwidthcom/jetono",
   "dependencies": {
+    "bcryptjs": "^2.0.2",
+    "co": "^3.1.0",
     "joi": "^4.6.1"
   }
 }

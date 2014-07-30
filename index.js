@@ -45,13 +45,17 @@ function defineModels(plugin, options){
     };
 
     let accessTokenSchema = new db.Schema({
-      token: {type: String, unique: true, required: true},
-      user: {type: db.Schema.Types.ObjectId, ref: "users"}
+      token: {type: String, unique: true},
+      user: {type: db.Schema.Types.ObjectId, ref: "users", required: true, index: true}
     });
 
     accessTokenSchema.pre("save", function(next){
+      const length = 24;
       let self = this;
-      crypto.randomBytes(16, function(err, buf){
+      if(self.token){
+        return next();
+      }
+      crypto.randomBytes(length, function(err, buf){
         if(err) return next(err);
         let result = [];
         for(let i = 0; i < length; i ++){
@@ -79,7 +83,7 @@ function defineModels(plugin, options){
 
 module.exports.register = function*(plugin, options){
   Joi.assert(options, optionsSchema);
-  defineModels(plugin, option);
+  defineModels(plugin, options);
   let accessTokenCache = plugin.cache({segment: "!!accessTokenCache", expiresIn: options.accessTokenCacheExpiresIn || 300000});
   let validateToken = function* (plugin, models, token){
     return yield accessTokenCache.getOrGenerate.bind(accessTokenCache, token, function(callback){co(function*(){
