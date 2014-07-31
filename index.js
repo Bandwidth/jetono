@@ -138,6 +138,7 @@ module.exports.register = function*(plugin, options){
         userName = items[0];
         password = items[1];
       }
+      request.payload = request.payload || {};
       if(!userName){
         userName = request.payload[config.userNameField || "username"];
       }
