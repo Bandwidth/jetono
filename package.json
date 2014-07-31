@@ -1,6 +1,6 @@
 {
   "name": "jetono",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Simple token based auth provider for service_makery",
   "repository": {
     "type": "git",
