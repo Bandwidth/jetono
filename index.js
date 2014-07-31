@@ -16,7 +16,7 @@ let optionsSchema = Joi.object().keys({
   pepper: Joi.string().min(10).default("JcmjuDxZf8zm"),
   extendUserModel: Joi.func(),
   extendAccessTokenModel: Joi.func(),
-  accessTokenCacheExpiresIn: Joi.number()
+  accessTokenCacheExpiresIn: Joi.number().default(300000)
 });
 
 function defineModels(plugin, options){
