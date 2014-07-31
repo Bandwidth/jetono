@@ -5,17 +5,7 @@ describe("models", function(){
   let server;
   before(function*(){
     server = yield helper.startServer({
-      minPasswordLength: 4,
-      extendUserModel: function(schema){
-        schema.virtual("name").get(function () {
-          return this.userName;
-        });
-      },
-      extendAccessTokenModel: function(schema){
-        schema.virtual("accessToken").get(function () {
-          return this.token;
-        });
-      }
+      minPasswordLength: 4
     });
   });
 
@@ -25,16 +15,16 @@ describe("models", function(){
 
   it("should add models user and accessToken", function*(){
     let models = yield server.methods.models.get();
-    let user = new models.user({userName: "user1"});
-    user.name.should.equal("user1");
-    let accessToken = new models.accessToken({token: "token1", user: user});
-    accessToken.accessToken.should.equal("token1");
+    models.user.should.be.ok;
+    models.accessToken.should.be.ok;
   });
 
   it("should add ability to extend models user and accessToken", function*(){
     let models = yield server.methods.models.get();
-    models.user.should.be.ok;
-    models.accessToken.should.be.ok;
+    let user = new models.user({userName: "user1"});
+    user.name.should.equal("user1");
+    let accessToken = new models.accessToken({token: "token1", user: user});
+    accessToken.accessToken.should.equal("token1");
   });
 
   describe("user", function(){

@@ -6,7 +6,7 @@ let bcrypt = require("bcryptjs");
 let crypto = require("crypto");
 
 const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-const charlen = chars.length
+const charlen = chars.length;
 
 
 let optionsSchema = Joi.object().keys({
@@ -22,60 +22,63 @@ let optionsSchema = Joi.object().keys({
 function defineModels(plugin, options){
   plugin.dependency(["co-hapi-mongoose", "co-hapi-models"], function*(plugin){
     let db = plugin.plugins["co-hapi-mongoose"].mongoose;
-    let userSchema = new db.Schema({
-      userName: {type: String, unique: true, required: true},
-      encryptedPassword: String
-    });
-
-    userSchema.methods.setPassword = function*(password){
-      if(!password){
-        this.set("encryptedPassword", null);
-        return;
-      }
-      let l = (options.minPasswordLength || 6);
-      if(password.length < l){
-        throw plugin.hapi.error.unauthorized("Password must contains more or equal " +  l + " symbols");
-      }
-      let hash = yield bcrypt.hash.bind(bcrypt, password + options.pepper, ((process.env.NODE_ENV == "test")?4:10));
-      this.set("encryptedPassword", hash);
-    };
-    userSchema.methods.comparePassword = function*(password){
-      let res = yield bcrypt.compare.bind(bcrypt, password + options.pepper, (this.get("encryptedPassword") || ""));
-      return res;
-    };
-
-    let accessTokenSchema = new db.Schema({
-      token: {type: String, unique: true},
-      user: {type: db.Schema.Types.ObjectId, ref: "users", required: true, index: true}
-    });
-
-    accessTokenSchema.pre("save", function(next){
-      const length = 24;
-      let self = this;
-      if(self.token){
-        return next();
-      }
-      crypto.randomBytes(length, function(err, buf){
-        if(err) return next(err);
-        let result = [];
-        for(let i = 0; i < length; i ++){
-          let index = (buf.readUInt8(i) % charlen);
-          result.push(chars[index]);
-        }
-        self.token = result.join("");
-        next();
+    let userSchema, accessTokenSchema;
+    if(!db.models.users){
+      userSchema = new db.Schema({
+        userName: {type: String, unique: true, required: true},
+        encryptedPassword: String
       });
-    });
 
-    if(options.extendUserModel){
-      options.extendUserModel(userSchema);
+      userSchema.methods.setPassword = function*(password){
+        if(!password){
+          this.set("encryptedPassword", null);
+          return;
+        }
+        let l = (options.minPasswordLength || 6);
+        if(password.length < l){
+          throw plugin.hapi.error.unauthorized("Password must contains more or equal " +  l + " symbols");
+        }
+        let hash = yield bcrypt.hash.bind(bcrypt, password + options.pepper, ((process.env.NODE_ENV == "test")?4:10));
+        this.set("encryptedPassword", hash);
+      };
+      userSchema.methods.comparePassword = function*(password){
+        let res = yield bcrypt.compare.bind(bcrypt, password + options.pepper, (this.get("encryptedPassword") || ""));
+        return res;
+      };
+      if(options.extendUserModel){
+        options.extendUserModel(userSchema);
+      }
     }
-    if(options.extendAccessTokenModel){
-      options.extendAccessTokenModel(accessTokenSchema);
+    if(!db.models.accessTokens){
+      accessTokenSchema = new db.Schema({
+        token: {type: String, unique: true},
+        user: {type: db.Schema.Types.ObjectId, ref: "users", required: true, index: true}
+      });
+
+      accessTokenSchema.pre("save", function(next){
+        const length = 24;
+        let self = this;
+        if(self.token){
+          return next();
+        }
+        crypto.randomBytes(length, function(err, buf){
+          if(err) return next(err);
+          let result = [];
+          for(let i = 0; i < length; i ++){
+            let index = (buf.readUInt8(i) % charlen);
+            result.push(chars[index]);
+          }
+          self.token = result.join("");
+          next();
+        });
+      });
+      if(options.extendAccessTokenModel){
+        options.extendAccessTokenModel(accessTokenSchema);
+      }
     }
     yield plugin.methods.models.register({
-      user: db.model("users", userSchema),
-      accessToken: db.model("accessTokens", accessTokenSchema)
+      user: db.models.users || db.model("users", userSchema),
+      accessToken: db.models.accessTokens || db.model("accessTokens", accessTokenSchema)
     });
   });
 };
@@ -101,7 +104,6 @@ module.exports.register = function*(plugin, options){
 
   plugin.auth.scheme("jetono-token", function (server, config) {
     config = config || {};
-    debugger;
     return {
       authenticate : function (request, reply) {
         co(function*(){
