@@ -13,17 +13,23 @@ Also you can add own validation procedure with setting `validateToken` like
 server.auth.strategy("token", "jetono-token", {validateToken: function*(accessToken){
   //accessToken.token - token value
   //accessToken.user - user's data
-  //throw an exeption here to fail validation
+  //throw an exception here to fail validation
 }});
 ```
 
 ### Options
 `tokenField` is name of query filed with token value (default: token),
+
 `validateToken` is global custom token validator,
+
 `minPasswordLength` is minimal allowed password length (default: 6),
+
 `pepper` is pepper value to validate password (min 10 symbols),
+
 `extendUserModel` is function to extend user schema (like function(schema){}),
+
 `extendAccessTokenModel`:  is function to extend accessToken schema (like function(schema){}),
+
 `accessTokenCacheExpiresIn`: time (in ms) to live of accessToken items in cache (default: 300000 (5 minutes))
 
 
