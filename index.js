@@ -155,7 +155,7 @@ module.exports.register = function*(plugin, options){
         throw plugin.hapi.error.unauthorized();
       }
       let accessToken = yield new request.models.accessToken({user: user.id}).saveQ();
-      return {credentials: {username: user.userName, id: user.id, token: accessToken.token}};
+      return {token: accessToken.token};
     };
   });
 
@@ -181,7 +181,7 @@ module.exports.register = function*(plugin, options){
       yield user.setPassword(password);
       yield user.saveQ();
       let accessToken = yield new request.models.accessToken({user: user.id}).saveQ();
-      return {credentials: {username: user.userName, id: user.id, token: accessToken.token}};
+      return {token: accessToken.token};
     };
   });
 };

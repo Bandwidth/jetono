@@ -47,11 +47,10 @@ describe("auth", function(){
     it("should register new user and return access token", function*(){
       let result = yield supertest(server.listener).post("/signup")
         .send({username: "testUser", password: "1234567890",  repeatPassword: "1234567890"}).expect(200).end();
-      result.body.credentials.username.should.equal("testUser");
-      result.body.credentials.token.should.be.ok;
+      result.body.token.should.be.ok;
       let user = yield models.user.findOne({userName: "testUser"}).execQ();
       (!!user).should.be.true;
-      let accessToken = yield models.accessToken.findOne({token: result.body.credentials.token}).execQ();
+      let accessToken = yield models.accessToken.findOne({token: result.body.token}).execQ();
       (!!accessToken).should.be.true;
       accessToken.user.toString().should.equal(user.id);
     });
@@ -78,11 +77,10 @@ describe("auth", function(){
     it("should return access token", function*(){
       let result = yield supertest(server.listener).post("/signin")
         .send({username: "testUser", password: "1234567890"}).expect(200).end();
-      result.body.credentials.username.should.equal("testUser");
-      result.body.credentials.token.should.be.ok;
+      result.body.token.should.be.ok;
       let user = yield models.user.findOne({userName: "testUser"}).execQ();
       (!!user).should.be.true;
-      let accessToken = yield models.accessToken.findOne({token: result.body.credentials.token}).execQ();
+      let accessToken = yield models.accessToken.findOne({token: result.body.token}).execQ();
       (!!accessToken).should.be.true;
       accessToken.user.toString().should.equal(user.id);
     });
@@ -103,7 +101,7 @@ describe("auth", function(){
       yield models.user.find({userName: "testUser"}).remove().execQ();
       let result = yield supertest(server.listener).post("/signup")
         .send({username: "testUser", password: "1234567890",  repeatPassword: "1234567890"}).expect(200).end();
-      token = result.body.credentials.token;
+      token = result.body.token;
     });
     it("should return credentials for valid token (via header)", function*(){
       let result = yield supertest(server.listener).get("/token")
