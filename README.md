@@ -20,7 +20,7 @@ server.auth.strategy("token", "jetono-token", {validateToken: function*(accessTo
 ### Options
 `tokenField` is name of query filed with token value (default: token),
 
-`validateToken` is global custom token validator,
+`validateToken` is global custom token validator (you can define it per strategy too),
 
 `minPasswordLength` is minimal allowed password length (default: 6),
 
