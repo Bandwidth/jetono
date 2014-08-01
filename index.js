@@ -128,42 +128,55 @@ module.exports.register = function*(plugin, options){
     };
   });
 
+  function* createToken(request, userName, password){
+    if(!request.models){
+      throw plugin.hapi.error.internal("plugin co-hapi-models is required");
+    }
+    let user = yield request.models.user.findOne({userName: userName}).execQ();
+    if(!user){
+      throw plugin.hapi.error.unauthorized();
+    }
+    if(!(yield user.comparePassword(password))){
+      throw plugin.hapi.error.unauthorized();
+    }
+    return {user: user, accessToken: yield new request.models.accessToken({user: user.id}).saveQ()};
+  }
+
   plugin.auth.scheme("jetono-signin", function (server, config) {
     config = config || {};
     return {
       authenticate : function (request, reply) {
-        reply(null, {credentials: {}}); //nothing do here because we need access to payload
-      },
-
-      payload: function(request, next){
         co(function*(){
-          let userName, password;
           let items = (request.headers.authorization || "").split(" ");
           if(items[0].toLowerCase() === "basic" && items[1]){
             items = new Buffer(items[1], "base64").toString().split(":");
-            userName = items[0];
-            password = items[1];
+            let result = yield createToken(request, items[0], items[1]);
+            return {
+              credentials: {username: result.user.userName, id: result.user.id},
+              artifacts: {token: result.accessToken.token}
+            };
+          }
+          return {
+            credentials: {}
+          };
+        })(reply);
+      },
+
+      payload: function(request, next){
+        //this function is not called if request.payload is missing
+        co(function*(){
+          if(request.auth.credentials
+             && request.auth.credentials.userName
+             && request.auth.artifacts
+             && request.auth.artifacts.token){
+            return;
           }
           request.payload = request.payload || {};
-          if(!userName){
-            userName = request.payload[config.userNameField || "username"];
-          }
-          if(!password){
-            password = request.payload[config.passwordField || "password"];
-          }
-          if(!request.models){
-            throw plugin.hapi.error.internal("plugin co-hapi-models is required");
-          }
-          let user = yield request.models.user.findOne({userName: userName}).execQ();
-          if(!user){
-            throw plugin.hapi.error.unauthorized();
-          }
-          if(!(yield user.comparePassword(password))){
-            throw plugin.hapi.error.unauthorized();
-          }
-          let accessToken = yield new request.models.accessToken({user: user.id}).saveQ();
-          request.auth.credentials = {username: user.userName, id: user.id};
-          request.auth.artifacts = {token: accessToken.token};
+          let userName = request.payload[config.userNameField || "username"];
+          let password = request.payload[config.passwordField || "password"];
+          let result = yield createToken(request, userName, password);
+          request.auth.credentials = {username: result.user.userName, id: result.user.id};
+          request.auth.artifacts = {token: result.accessToken.token};
         })(next);
       }
     };
@@ -197,7 +210,6 @@ module.exports.register = function*(plugin, options){
           yield user.setPassword(password);
           yield user.saveQ();
           let accessToken = yield new request.models.accessToken({user: user.id}).saveQ();
-          debugger;
           request.auth.credentials = {username: user.userName, id: user.id};
           request.auth.artifacts = {token: accessToken.token};
         })(next);
