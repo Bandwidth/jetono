@@ -128,61 +128,80 @@ module.exports.register = function*(plugin, options){
     };
   });
 
-  plugin.handler("jetono-signin", function (route, config){
+  plugin.auth.scheme("jetono-signin", function (server, config) {
     config = config || {};
-    return function*(request){
-      let userName, password;
-      let items = (request.headers.authorization || "").split(" ");
-      if(items[0].toLowerCase() === "basic" && items[1]){
-        items = new Buffer(items[1], "base64").toString().split(":");
-        userName = items[0];
-        password = items[1];
+    return {
+      authenticate : function (request, reply) {
+        reply(null, {credentials: {}}); //nothing do here because we need access to payload
+      },
+
+      payload: function(request, next){
+        co(function*(){
+          let userName, password;
+          let items = (request.headers.authorization || "").split(" ");
+          if(items[0].toLowerCase() === "basic" && items[1]){
+            items = new Buffer(items[1], "base64").toString().split(":");
+            userName = items[0];
+            password = items[1];
+          }
+          request.payload = request.payload || {};
+          if(!userName){
+            userName = request.payload[config.userNameField || "username"];
+          }
+          if(!password){
+            password = request.payload[config.passwordField || "password"];
+          }
+          if(!request.models){
+            throw plugin.hapi.error.internal("plugin co-hapi-models is required");
+          }
+          let user = yield request.models.user.findOne({userName: userName}).execQ();
+          if(!user){
+            throw plugin.hapi.error.unauthorized();
+          }
+          if(!(yield user.comparePassword(password))){
+            throw plugin.hapi.error.unauthorized();
+          }
+          let accessToken = yield new request.models.accessToken({user: user.id}).saveQ();
+          request.auth.credentials = {username: user.userName, id: user.id};
+          request.auth.artifacts = {token: accessToken.token};
+        })(next);
       }
-      request.payload = request.payload || {};
-      if(!userName){
-        userName = request.payload[config.userNameField || "username"];
-      }
-      if(!password){
-        password = request.payload[config.passwordField || "password"];
-      }
-      if(!request.models){
-        throw plugin.hapi.error.internal("plugin co-hapi-models is required");
-      }
-      let user = yield request.models.user.findOne({userName: userName}).execQ();
-      if(!user){
-        throw plugin.hapi.error.unauthorized();
-      }
-      if(!(yield user.comparePassword(password))){
-        throw plugin.hapi.error.unauthorized();
-      }
-      let accessToken = yield new request.models.accessToken({user: user.id}).saveQ();
-      return {token: accessToken.token};
     };
   });
 
-  plugin.handler("jetono-signup", function (route, config){
+  plugin.auth.scheme("jetono-signup", function (server, config) {
     config = config || {};
-    return function*(request, reply){
-      let userName, password, repeatPassword;
-      if(request.payload){
-        userName = request.payload[config.userNameField || "username"];
-        password = request.payload[config.passwordField || "password"];
-        repeatPassword = request.payload[config.repeatPasswordField || "repeatPassword"];
+    return {
+      authenticate : function (request, reply) {
+        reply(null, {credentials: {}}); //nothing do here because we need access to payload
+      },
+
+      payload: function(request, next){
+        co(function*(){
+          let userName, password, repeatPassword;
+          if(request.payload){
+            userName = request.payload[config.userNameField || "username"];
+            password = request.payload[config.passwordField || "password"];
+            repeatPassword = request.payload[config.repeatPasswordField || "repeatPassword"];
+          }
+          if(!userName || !password || !repeatPassword){
+            throw plugin.hapi.error.badRequest();
+          }
+          if(repeatPassword !== password){
+            throw plugin.hapi.error.unauthorized("Passwords are mismatched");
+          }
+          if(!request.models){
+            throw plugin.hapi.error.internal("plugin co-hapi-models is required");
+          }
+          let user = new request.models.user({userName: userName});
+          yield user.setPassword(password);
+          yield user.saveQ();
+          let accessToken = yield new request.models.accessToken({user: user.id}).saveQ();
+          debugger;
+          request.auth.credentials = {username: user.userName, id: user.id};
+          request.auth.artifacts = {token: accessToken.token};
+        })(next);
       }
-      if(!userName || !password || !repeatPassword){
-        throw plugin.hapi.error.badRequest();
-      }
-      if(repeatPassword !== password){
-        throw plugin.hapi.error.unauthorized("Passwords are mismatched");
-      }
-      if(!request.models){
-        throw plugin.hapi.error.internal("plugin co-hapi-models is required");
-      }
-      let user = new request.models.user({userName: userName});
-      yield user.setPassword(password);
-      yield user.saveQ();
-      let accessToken = yield new request.models.accessToken({user: user.id}).saveQ();
-      return {token: accessToken.token};
     };
   });
 };

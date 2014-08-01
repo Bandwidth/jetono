@@ -8,15 +8,35 @@ describe("auth", function(){
   before(function*(){
     server = yield helper.startServer({});
     server.auth.strategy("token", "jetono-token");
+    server.auth.strategy("signin", "jetono-signin");
+    server.auth.strategy("signup", "jetono-signup");
     server.auth.strategy("token2", "jetono-token", token2Settings);
     server.route([{
       method: "POST",
       path: "/signup",
-      handler: {"jetono-signup": {}}
+      config: {
+        auth: {
+          strategy: "signup",
+          mode: "required",
+          payload: true
+        }
+      },
+      handler: function*(request){
+        return request.auth;
+      }
     },{
       method: "POST",
       path: "/signin",
-      handler: {"jetono-signin": {}}
+      config: {
+        auth: {
+          strategy: "signin",
+          mode: "required",
+          payload: true
+        }
+      },
+      handler: function*(request){
+        return request.auth;
+      }
     },{
       config: {auth: "token"},
       handler: function* (request) {
@@ -47,10 +67,11 @@ describe("auth", function(){
     it("should register new user and return access token", function*(){
       let result = yield supertest(server.listener).post("/signup")
         .send({username: "testUser", password: "1234567890",  repeatPassword: "1234567890"}).expect(200).end();
-      result.body.token.should.be.ok;
+      result.body.artifacts.token.should.be.ok;
+      result.body.credentials.username.should.equal("testUser");
       let user = yield models.user.findOne({userName: "testUser"}).execQ();
       (!!user).should.be.true;
-      let accessToken = yield models.accessToken.findOne({token: result.body.token}).execQ();
+      let accessToken = yield models.accessToken.findOne({token: result.body.artifacts.token}).execQ();
       (!!accessToken).should.be.true;
       accessToken.user.toString().should.equal(user.id);
     });
@@ -77,10 +98,11 @@ describe("auth", function(){
     it("should return access token", function*(){
       let result = yield supertest(server.listener).post("/signin")
         .send({username: "testUser", password: "1234567890"}).expect(200).end();
-      result.body.token.should.be.ok;
+      result.body.artifacts.token.should.be.ok;
+      result.body.credentials.username.should.equal("testUser");
       let user = yield models.user.findOne({userName: "testUser"}).execQ();
       (!!user).should.be.true;
-      let accessToken = yield models.accessToken.findOne({token: result.body.token}).execQ();
+      let accessToken = yield models.accessToken.findOne({token: result.body.artifacts.token}).execQ();
       (!!accessToken).should.be.true;
       accessToken.user.toString().should.equal(user.id);
     });
@@ -101,7 +123,7 @@ describe("auth", function(){
       yield models.user.find({userName: "testUser"}).remove().execQ();
       let result = yield supertest(server.listener).post("/signup")
         .send({username: "testUser", password: "1234567890",  repeatPassword: "1234567890"}).expect(200).end();
-      token = result.body.token;
+      token = result.body.artifacts.token;
     });
     it("should return credentials for valid token (via header)", function*(){
       let result = yield supertest(server.listener).get("/token")
