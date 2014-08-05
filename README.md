@@ -1,6 +1,9 @@
 ## jetono
 
-Simple token based auth provider for service_maker. PLugins `co-hapi-mongoose` and `co-hapi-models` are required to use this plugin.
+[![Build](https://travis-ci.org/bandwidthcom/jetono.png)](https://travis-ci.org/bandwidthcom/jetono)
+[![Dependencies](https://david-dm.org/bandwidthcom/jetono.png)](https://david-dm.org/bandwidthcom/jetono)
+
+Simple token based auth provider for service_maker. Plugins `co-hapi-mongoose` and `co-hapi-models` are required to use this plugin.
 
 After installing this plugin you can use
 
