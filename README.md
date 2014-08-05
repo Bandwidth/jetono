@@ -51,7 +51,9 @@ server.route({
   handler: {"jetono-signup": {}}
 }); //POST /auth/signin with form fields 'username',  'password' and 'repeatPassword' (you can change field names if need)
 
+
 server.auth.strategy("token", "jetono-token");
+
 server.route({
   method: "GET",
   path: "/protected/resource",
