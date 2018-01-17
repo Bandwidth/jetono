@@ -1,3 +1,5 @@
+# ⚠️ DEPRECATED⚠️ 
+
 ## jetono
 [![Build](https://travis-ci.org/bandwidthcom/jetono.png)](https://travis-ci.org/bandwidthcom/jetono)
 [![Dependencies](https://david-dm.org/bandwidthcom/jetono.png)](https://david-dm.org/bandwidthcom/jetono)
